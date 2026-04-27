@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff">
+  <title>코딩중</title>
+
+  <!-- 폰트 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- highlight.js CSS (다크 테마) -->
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+
+  <!-- 앱 스타일 -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     🔐 로그인 화면
+════════════════════════════════════════ -->
+<div id="screen-login" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">코딩중</div>
+    <p class="login-sub">코딩 작업 관리</p>
+
+    <!-- 설정 미완료 경고 -->
+    <div id="config-warning">
+      ⚠️ js/config.js의 SUPABASE_URL, SUPABASE_ANON을<br>실제 값으로 교체해 주세요.
+    </div>
+
+    <form id="login-form">
+      <label class="login-label" for="login-email">이메일</label>
+      <input id="login-email" class="login-input" type="email"
+             placeholder="email@example.com" autocomplete="email" required>
+
+      <label class="login-label" for="login-pw">비밀번호</label>
+      <input id="login-pw" class="login-input" type="password"
+             placeholder="비밀번호" autocomplete="current-password" required>
+
+      <button id="login-btn" class="login-btn" type="submit">로그인</button>
+      <p id="login-error" class="login-error"></p>
+    </form>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     📱 앱 화면
+════════════════════════════════════════ -->
+<div id="screen-app" style="display:none">
+
+  <!-- ── 헤더 ─────────────────────────── -->
+  <header class="app-header">
+    <button id="btn-home" class="btn-home" aria-label="홈으로">🏠 홈</button>
+    <div id="app-logo"><span class="logo-icon">💻</span> 코딩중</div>
+    <button id="btn-settings" class="btn-settings" aria-label="설정">⚙️</button>
+  </header>
+
+  <!-- ── 설정 드로어 ────────────────────── -->
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+  <div id="settings-drawer" class="settings-drawer">
+    <div class="drawer-header">
+      <span class="drawer-title">설정</span>
+      <button id="drawer-close" class="drawer-close">✕</button>
+    </div>
+    <ul class="drawer-menu">
+      <li>
+        <button id="btn-logout" class="drawer-menu-item drawer-menu-item--danger">
+          <span class="drawer-menu-icon">🚪</span>
+          <span>로그아웃</span>
+        </button>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ── 메인 콘텐츠 ───────────────────── -->
+  <main class="app-main">
+
+    <!-- 로딩 오버레이 -->
+    <div id="app-loader">⏳ 불러오는 중…</div>
+
+    <!-- ┌─────────────────────────────┐
+         │  홈 뷰 (기본 화면)          │
+         └─────────────────────────────┘ -->
+    <div id="view-home" class="view">
+      <div class="home-center">
+
+      <!-- 삼각형 배치: 진행중(위), 구현전(좌하), 완료(우하) -->
+      <div class="home-triangle">
+
+        <!-- 위: 진행중 -->
+        <div class="triangle-top">
+          <div class="circle-node">
+            <div class="circle-ring">
+              <span class="circle-icon">🛠️</span>
+              <div id="badge-inprogress" class="circle-badge" style="display:none">0</div>
+            </div>
+            <span class="circle-label">진행 중</span>
+          </div>
+        </div>
+
+
+
+        <!-- 아래: 구현전(좌) + 완료(우) -->
+        <div class="triangle-bottom">
+          <div class="circle-node">
+            <div class="circle-ring">
+              <span class="circle-icon">💡</span>
+              <div id="badge-pending" class="circle-badge" style="display:none">0</div>
+            </div>
+            <span class="circle-label">아이디어</span>
+          </div>
+
+          <div class="circle-node">
+            <div class="circle-ring">
+              <span class="circle-icon">🏆</span>
+              <div id="badge-completed" class="circle-badge" style="display:none">0</div>
+            </div>
+            <span class="circle-label">완료</span>
+          </div>
+        </div>
+
+      </div><!-- /home-triangle -->
+
+      </div><!-- /home-center -->
+    </div><!-- /view-home -->
+
+
+    <!-- ┌─────────────────────────────┐
+         │  프로젝트 뷰 (진행중·완료·구현전 공유)│
+         └─────────────────────────────┘ -->
+    <div id="view-projects" class="view">
+      <div id="project-view-title"></div>
+      <div id="project-list" class="project-list"></div>
+    </div>
+
+
+    <!-- ┌─────────────────────────────┐
+         │  코드 뷰                    │
+         └─────────────────────────────┘ -->
+    <div id="view-code" class="view">
+      <div id="search-bar-code" class="search-bar" style="display:none">
+        <input id="code-search-input" type="search" placeholder="제목, 코드, 태그로 검색…">
+      </div>
+      <div id="code-list" class="code-list"></div>
+    </div>
+
+
+    <!-- ┌─────────────────────────────┐
+         │  메모 뷰                    │
+         └─────────────────────────────┘ -->
+    <div id="view-memo" class="view">
+      <div id="search-bar-memo" class="search-bar" style="display:none">
+        <input id="memo-search-input" type="search" placeholder="제목, 내용, 태그로 검색…">
+      </div>
+      <div id="memo-list" class="memo-list"></div>
+    </div>
+
+  </main><!-- /app-main -->
+
+
+  <!-- ── FAB (+ 버튼) ──────────────────── -->
+  <button id="fab-add" style="display:none" aria-label="추가">＋</button>
+
+
+  <!-- ── 하단 탭 ────────────────────────── -->
+  <nav class="bottom-tabs" role="tablist">
+    <button class="tab-btn" data-tab="in_progress" role="tab" aria-label="진행중">
+      <span class="tab-icon">🛠️</span>
+      <span class="tab-label">진행중</span>
+    </button>
+    <button class="tab-btn" data-tab="completed" role="tab" aria-label="완료">
+      <span class="tab-icon">🏆</span>
+      <span class="tab-label">완료</span>
+    </button>
+    <button class="tab-btn" data-tab="pending" role="tab" aria-label="구현전">
+      <span class="tab-icon">💡</span>
+      <span class="tab-label">아이디어</span>
+    </button>
+    <button class="tab-btn" data-tab="code" role="tab" aria-label="코드">
+      <span class="tab-icon">💻</span>
+      <span class="tab-label">코드</span>
+    </button>
+    <button class="tab-btn" data-tab="memo" role="tab" aria-label="메모">
+      <span class="tab-icon">📝</span>
+      <span class="tab-label">메모</span>
+    </button>
+  </nav>
+
+</div><!-- /screen-app -->
+
+
+<!-- ════════════════════════════════════════
+     📋 모달: 프로젝트 편집
+════════════════════════════════════════ -->
+<div id="proj-modal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <span id="proj-modal-head">새 항목 추가</span>
+      <button id="proj-close-btn" class="modal-close" aria-label="닫기">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <input id="proj-input-title" class="modal-input" type="text"
+             placeholder="제목" maxlength="100">
+
+      <textarea id="proj-input-memo" class="modal-textarea"
+                placeholder="메모 (선택사항)" rows="3"></textarea>
+
+      <!-- 체크리스트 섹션 -->
+      <div class="checklist-section">
+        <div class="checklist-header">
+          <span>체크리스트</span>
+          <div class="modal-progress">
+            <div class="progress-bar">
+              <div id="modal-prog-fill" class="progress-fill" style="width:0%"></div>
+            </div>
+            <span id="modal-prog-pct">0%</span>
+          </div>
+        </div>
+
+        <div class="checklist-add-row">
+          <input id="checklist-new-input" class="checklist-input" type="text"
+                 placeholder="새 항목 추가… (Enter)">
+          <button id="checklist-add-btn" class="btn-add-check" aria-label="항목 추가">+</button>
+        </div>
+
+        <div id="checklist-items" class="checklist-items"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="proj-save-btn" class="btn-primary">저장</button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     💻 모달: 코드 편집
+════════════════════════════════════════ -->
+<div id="code-modal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <span id="code-modal-head">새 코드 추가</span>
+      <button id="code-close-btn" class="modal-close" aria-label="닫기">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <input id="code-input-title" class="modal-input" type="text"
+             placeholder="제목" maxlength="100">
+
+      <textarea id="code-input-memo" class="modal-textarea"
+                placeholder="메모 (선택사항)" rows="2"></textarea>
+
+      <input id="code-input-tags" class="modal-input" type="text"
+             placeholder="태그 (쉼표로 구분: auth, supabase, python)">
+
+      <!-- 코드 에디터 -->
+      <div class="code-editor-wrap">
+        <div class="code-editor-toolbar">
+          <span id="code-lang-badge">언어: 자동 감지됨</span>
+          <div class="editor-btns">
+            <button id="code-toggle-btn" class="btn-editor">👁 미리보기</button>
+            <button id="code-copy-btn"   class="btn-editor">📋 복사</button>
+          </div>
+        </div>
+
+        <!-- 편집 영역 -->
+        <div id="code-editor-area">
+          <textarea id="code-input-code" class="code-textarea"
+                    placeholder="코드를 입력하세요…&#10;(Tab 키 → 들여쓰기 2칸)"
+                    spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+        </div>
+
+        <!-- 미리보기 영역 (highlight.js 렌더링) -->
+        <div id="code-preview-area" class="code-preview-area">
+          <pre><code id="code-preview-code"></code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="code-save-btn" class="btn-primary">저장</button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     📝 모달: 메모 편집
+════════════════════════════════════════ -->
+<div id="memo-modal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-box">
+
+    <div class="modal-header">
+      <span id="memo-modal-head">새 메모 추가</span>
+      <button id="memo-close-btn" class="modal-close" aria-label="닫기">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <input id="memo-input-title" class="modal-input" type="text"
+             placeholder="제목" maxlength="100">
+
+      <textarea id="memo-input-memo" class="modal-textarea"
+                placeholder="메모 내용을 입력하세요…" rows="8"></textarea>
+
+      <input id="memo-input-tags" class="modal-input" type="text"
+             placeholder="태그 (쉼표로 구분: react, tips)">
+    </div>
+
+    <div class="modal-footer">
+      <button id="memo-save-btn" class="btn-primary">저장</button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     📦 외부 라이브러리
+════════════════════════════════════════ -->
+<!-- Supabase JS SDK v2 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- highlight.js (언어 자동 감지) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<!-- ════════════════════════════════════════
+     🧩 앱 스크립트 (의존성 순서대로)
+════════════════════════════════════════ -->
+<script src="js/config.js"></script>   <!-- 1. Supabase 설정값 -->
+<script src="js/auth.js"></script>     <!-- 2. 인증 모듈 -->
+<script src="js/db.js"></script>       <!-- 3. DB CRUD + Realtime -->
+<script src="js/ui.js"></script>       <!-- 4. UI 유틸 (토스트, 모달, 드래그) -->
+<script src="js/projects.js"></script> <!-- 5. 프로젝트 탭 (진행중/완료/구현전) -->
+<script src="js/code.js"></script>     <!-- 6. 코드 탭 -->
+<script src="js/memo.js"></script>     <!-- 7. 메모 탭 -->
+<script src="js/app.js"></script>      <!-- 8. 앱 초기화 + 탭 라우팅 (AppState 포함) -->
+
+</body>
+</html>
