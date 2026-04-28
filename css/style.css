@@ -531,6 +531,7 @@ input, textarea {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  position: relative;
 }
 
 .project-card:active { transform: scale(.99); }
@@ -540,6 +541,17 @@ input, textarea {
   z-index: 100;
   border-color: var(--sky-4);
 }
+
+/* ── 진행도 세로 띠 ── */
+.progress-stripe {
+  width: 5px;
+  min-width: 5px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.stripe--gray  { background: #b0b8c1; }
+.stripe--amber { background: #c8922a; }
+.stripe--red   { background: #e03e3e; }
 
 .drag-handle {
   display: flex;
