@@ -192,7 +192,7 @@ const Projects = (() => {
     if (!id && _currentStatus !== 'pending') {
       App.switchTab('pending');
       setTimeout(() => {
-        document.getElementById('proj-modal-head').textContent = '새 항목 추가';
+        document.getElementById('proj-modal-head').textContent = '새 아이디어 추가';
         document.getElementById('proj-input-title').value = '';
         document.getElementById('proj-input-memo').value  = '';
         UI.setupMemoFeatures(document.getElementById('proj-input-memo'));
@@ -203,7 +203,7 @@ const Projects = (() => {
       return;
     }
 
-    document.getElementById('proj-modal-head').textContent = id ? '항목 편집' : '새 항목 추가';
+    document.getElementById('proj-modal-head').textContent = id ? '항목 편집' : '새 아이디어 추가';
     document.getElementById('proj-input-title').value = item?.title || '';
     document.getElementById('proj-input-memo').value  = item?.memo  || '';
 
