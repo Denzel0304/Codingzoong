@@ -212,11 +212,17 @@
     </div>
 
     <div class="modal-body">
-      <input id="proj-input-title" class="modal-input" type="text"
-             placeholder="" maxlength="100">
+      <div class="modal-field">
+        <label class="modal-label" for="proj-input-title">제목</label>
+        <input id="proj-input-title" class="modal-input" type="text"
+               placeholder="" maxlength="100">
+      </div>
 
-      <textarea id="proj-input-memo" class="modal-textarea"
-                placeholder="" rows="3"></textarea>
+      <div class="modal-field">
+        <label class="modal-label" for="proj-input-memo">메모</label>
+        <textarea id="proj-input-memo" class="modal-textarea"
+                  placeholder="" rows="3"></textarea>
+      </div>
 
       <!-- 체크리스트 섹션 -->
       <div class="checklist-section">
@@ -260,14 +266,23 @@
     </div>
 
     <div class="modal-body">
-      <input id="code-input-title" class="modal-input" type="text"
-             placeholder="" maxlength="100">
+      <div class="modal-field">
+        <label class="modal-label" for="code-input-title">제목</label>
+        <input id="code-input-title" class="modal-input" type="text"
+               placeholder="" maxlength="100">
+      </div>
 
-      <textarea id="code-input-memo" class="modal-textarea"
-                placeholder="" rows="2"></textarea>
+      <div class="modal-field">
+        <label class="modal-label" for="code-input-memo">메모</label>
+        <textarea id="code-input-memo" class="modal-textarea"
+                  placeholder="" rows="2"></textarea>
+      </div>
 
-      <input id="code-input-tags" class="modal-input" type="text"
-             placeholder="">
+      <div class="modal-field">
+        <label class="modal-label" for="code-input-tags">태그 <span class="modal-label-hint">(쉼표로 구분)</span></label>
+        <input id="code-input-tags" class="modal-input" type="text"
+               placeholder="">
+      </div>
 
       <!-- 코드 에디터 -->
       <div class="code-editor-wrap">
@@ -313,14 +328,23 @@
     </div>
 
     <div class="modal-body">
-      <input id="memo-input-title" class="modal-input" type="text"
-             placeholder="" maxlength="100">
+      <div class="modal-field">
+        <label class="modal-label" for="memo-input-title">제목</label>
+        <input id="memo-input-title" class="modal-input" type="text"
+               placeholder="" maxlength="100">
+      </div>
 
-      <textarea id="memo-input-memo" class="modal-textarea"
-                placeholder="" rows="8"></textarea>
+      <div class="modal-field">
+        <label class="modal-label" for="memo-input-memo">메모</label>
+        <textarea id="memo-input-memo" class="modal-textarea"
+                  placeholder="" rows="8"></textarea>
+      </div>
 
-      <input id="memo-input-tags" class="modal-input" type="text"
-             placeholder="">
+      <div class="modal-field">
+        <label class="modal-label" for="memo-input-tags">태그 <span class="modal-label-hint">(쉼표로 구분)</span></label>
+        <input id="memo-input-tags" class="modal-input" type="text"
+               placeholder="">
+      </div>
     </div>
 
     <div class="modal-footer">
