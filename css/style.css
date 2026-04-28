@@ -1152,7 +1152,7 @@ input, textarea {
 .checklist-add-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-top: 6px;
 }
 
 .checklist-input {
@@ -1185,16 +1185,17 @@ input, textarea {
 
 .btn-add-check:hover { background: var(--sky-5); }
 
-.checklist-items { display: flex; flex-direction: column; gap: 6px; }
+.checklist-items { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 
 .checklist-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px;
+  padding: 8px 8px;
   background: var(--white);
   border-radius: var(--radius-xs);
   border: 1px solid var(--sky-1);
+  min-height: 44px; /* 터치 영역 확보 */
 }
 
 .checklist-item--done {
@@ -1270,6 +1271,105 @@ input, textarea {
 }
 
 .check-del-btn:hover { color: var(--danger); }
+
+/* ── 체크리스트 드래그 핸들 ── */
+.check-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  padding: 0 4px;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity .2s;
+}
+.check-drag-handle:hover { opacity: 1; }
+.check-drag-handle:active { cursor: grabbing; }
+
+.check-drag-placeholder {
+  width: 32px;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+/* 체크리스트 햄버거 3선 */
+.check-drag-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.check-drag-icon::before,
+.check-drag-icon::after,
+.check-drag-icon span {
+  content: '';
+  display: block;
+  width: 16px;
+  height: 2px;
+  background: var(--sky-3);
+  border-radius: 2px;
+}
+
+/* 드래그 중 카드 스타일 */
+.check-dragging {
+  opacity: 0.5;
+  border: 1.5px dashed var(--sky-4) !important;
+  background: var(--sky-0) !important;
+}
+
+/* 체크리스트 드롭 인디케이터 */
+.check-drop-indicator {
+  height: 2px;
+  background: var(--sky-4);
+  border-radius: 2px;
+  margin: 2px 0;
+  pointer-events: none;
+}
+
+/* ── 메모 링크 미리보기 ── */
+.memo-link-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0;
+}
+
+.memo-link-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--sky-0);
+  border: 1.5px solid var(--sky-2);
+  border-radius: var(--radius-xs);
+  text-decoration: none;
+  font-size: .8rem;
+  color: var(--sky-5);
+  transition: background .15s, border-color .15s;
+  overflow: hidden;
+}
+.memo-link-item:hover { background: #e8f0fe; border-color: var(--sky-4); }
+
+.memo-link-domain {
+  font-weight: 600;
+  flex-shrink: 0;
+  color: var(--sky-5);
+}
+
+.memo-link-url {
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .73rem;
+}
 
 .checklist-divider {
   display: flex;
