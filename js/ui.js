@@ -109,7 +109,9 @@ const UI = (() => {
   }
 
   // ── 드래그 & 드롭 (터치 + 마우스) ───────────────────────────
-  function makeDraggable(listEl, onReorder) {
+  // onDragStart / onDragEnd: 드래그 상태를 외부에서 추적하기 위한 콜백
+  // projects.js의 _isDragging 플래그와 연동 — Realtime render() 재호출 차단용
+  function makeDraggable(listEl, onReorder, onDragStart, onDragEnd) {
     // 이전 호출의 모든 리스너(listEl + document) 한 번에 제거
     if (listEl._dragAbort) listEl._dragAbort.abort();
     const ac     = new AbortController();
@@ -163,6 +165,7 @@ const UI = (() => {
       listEl.classList.add('list--dragging');
       document.body.style.userSelect = 'none';
       placeIndicator(clientY(e));
+      if (typeof onDragStart === 'function') onDragStart(); // ★ 드래그 시작 알림
     }
 
     function onMove(e) {
@@ -184,6 +187,7 @@ const UI = (() => {
       listEl.classList.remove('list--dragging');
       document.body.style.userSelect = '';
       const newOrder = getItems().map((el, i) => ({ id: el.dataset.id, sort_order: i }));
+      if (typeof onDragEnd === 'function') onDragEnd(); // ★ 드래그 종료 알림
       onReorder(newOrder).catch(() => UI.toast('순서 저장 실패', 'error'));
       dragging = null;
     }
@@ -202,6 +206,7 @@ const UI = (() => {
       dragging.classList.remove('dragging');
       listEl.classList.remove('list--dragging');
       document.body.style.userSelect = '';
+      if (typeof onDragEnd === 'function') onDragEnd(); // ★
       dragging = null;
     }, opt);
     // contextmenu는 document에서 차단 — listEl만 막으면 브라우저가 먼저 처리
