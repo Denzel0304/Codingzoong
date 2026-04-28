@@ -40,7 +40,12 @@ const Projects = (() => {
 
       const notStarted = items
         .filter(i => calcProgress(i.checklist) === 0)
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // 오래된 것 위, 최신 아래
+        .sort((a, b) => {
+          // sort_order가 다르면 sort_order 우선 (드래그 결과 반영)
+          if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+          // 같으면 오래된 것이 위, 최신이 아래
+          return new Date(a.created_at) - new Date(b.created_at);
+        });
 
       sorted = [...inProgress, ...notStarted];
     } else {
@@ -464,8 +469,17 @@ const Projects = (() => {
 
     if (!_editingId) {
       const existing = AppState.getProjects(status);
-      const minOrd   = existing.length ? Math.min(...existing.map(i => i.sort_order)) : 0;
-      payload.sort_order = minOrd - 1;
+      // 수정중 탭 0% 항목은 최신이 아래 → sort_order를 최댓값+1로
+      // 완료/아이디어는 기존대로 최상단(min-1)
+      let newSortOrder;
+      if (status === 'in_progress') {
+        const maxOrd = existing.length ? Math.max(...existing.map(i => i.sort_order)) : 0;
+        newSortOrder = maxOrd + 1;
+      } else {
+        const minOrd = existing.length ? Math.min(...existing.map(i => i.sort_order)) : 0;
+        newSortOrder = minOrd - 1;
+      }
+      payload.sort_order = newSortOrder;
       payload.type       = 'project';
     }
 
