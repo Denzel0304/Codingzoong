@@ -64,6 +64,7 @@ const App = (() => {
     _bindEvents();
     Code.setupCodeEditor();
     _setupVisibilityChange(); // 탭 복귀 감지
+    UI.initModalBackHandler(); // 뒤로가기로 모달 닫기
   }
 
   // ── 로그인 성공 ──────────────────────────────────────────────

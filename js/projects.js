@@ -28,10 +28,28 @@ const Projects = (() => {
       return;
     }
 
-    const sorted = [...items].sort((a, b) => {
-      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
+    // ── 수정중 탭 정렬 ────────────────────────────────────────
+    // 진행중(1%~99%) 항목: 완료도 높은 순 → 상단 그룹
+    // 나머지(0%): 오래된 것이 위, 최신이 아래 (created_at 오름차순)
+    // 드래그 sort_order는 같은 그룹 내에서만 유효
+    let sorted;
+    if (status === 'in_progress') {
+      const inProgress = items
+        .filter(i => calcProgress(i.checklist) > 0)
+        .sort((a, b) => calcProgress(b.checklist) - calcProgress(a.checklist));
+
+      const notStarted = items
+        .filter(i => calcProgress(i.checklist) === 0)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // 오래된 것 위, 최신 아래
+
+      sorted = [...inProgress, ...notStarted];
+    } else {
+      // 완료/아이디어: sort_order 우선, 같으면 최신 아래
+      sorted = [...items].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        return new Date(a.created_at) - new Date(b.created_at);
+      });
+    }
 
     const isComplete = (status === 'completed');
 
@@ -41,11 +59,23 @@ const Projects = (() => {
       el.className  = 'sortable-item project-card';
       el.dataset.id = item.id;
 
+      // ── 수정중 탭: 진행 세로 띠 색상 ──
+      // 0%: 없음, 1~33%: 회색, 34~66%: 황토색, 67~99%: 빨간색, 100%: 완료탭으로 이동됨
+      let progressStripe = '';
+      if (status === 'in_progress' && pct > 0 && pct < 100) {
+        let stripeClass = '';
+        if (pct <= 33)       stripeClass = 'stripe--gray';
+        else if (pct <= 66)  stripeClass = 'stripe--amber';
+        else                 stripeClass = 'stripe--red';
+        progressStripe = `<div class="progress-stripe ${stripeClass}"></div>`;
+      }
+
       const actionBtn = isComplete
         ? `<button class="btn-del-item" title="삭제">✕</button>`
         : `<button class="btn-more" title="더보기">⋮</button>`;
 
       el.innerHTML = `
+        ${progressStripe}
         <div class="drag-handle" title="길게 눌러 순서 변경">
           <span class="drag-icon"><span></span></span>
         </div>
@@ -91,6 +121,8 @@ const Projects = (() => {
       listEl.appendChild(el);
     });
 
+    // 드래그: 수정중 탭에서는 진행중 그룹(pct>0) 내 정렬이 항상 완료도 순이므로
+    // 드래그 후 sort_order 저장은 하되, render 시 정렬 기준이 우선 적용됨
     UI.makeDraggable(listEl,
       async (newOrder) => {
         newOrder.forEach(({ id, sort_order }) => {
@@ -158,7 +190,11 @@ const Projects = (() => {
     UI.setupMemoFeatures(document.getElementById('proj-input-memo'));
     renderChecklist();
     UI.openModal(document.getElementById('proj-modal'));
-    document.getElementById('proj-input-title').focus();
+
+    // 신규 추가일 때만 제목 포커스 (기존 항목 편집 시 포커스 없음)
+    if (!id) {
+      setTimeout(() => document.getElementById('proj-input-title').focus(), 80);
+    }
   }
 
   // ── 체크리스트 렌더링 ─────────────────────────────────────────

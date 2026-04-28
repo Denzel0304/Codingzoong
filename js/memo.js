@@ -78,7 +78,7 @@ const Memo = (() => {
 
     UI.setupMemoFeatures(document.getElementById('memo-input-memo'));
     UI.openModal(document.getElementById('memo-modal'));
-    setTimeout(() => document.getElementById('memo-input-title').focus(), 80);
+    if (!id) setTimeout(() => document.getElementById('memo-input-title').focus(), 80);
   }
 
   // ── 저장 ─────────────────────────────────────────────────────

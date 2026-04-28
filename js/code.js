@@ -101,7 +101,7 @@ const Code = (() => {
     _showEditor(true);
 
     UI.openModal(document.getElementById('code-modal'));
-    setTimeout(() => document.getElementById('code-input-title').focus(), 80);
+    if (!id) setTimeout(() => document.getElementById('code-input-title').focus(), 80);
   }
 
   // ── 에디터/미리보기 전환 ─────────────────────────────────────
