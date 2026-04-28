@@ -188,6 +188,21 @@ const Projects = (() => {
     const item     = id ? AppState.getById(id) : null;
     _checklist = item ? JSON.parse(JSON.stringify(item.checklist || [])) : [];
 
+    // 신규 추가(+ 버튼) → 항상 아이디어 탭으로 전환 후 모달 오픈
+    if (!id && _currentStatus !== 'pending') {
+      App.switchTab('pending');
+      setTimeout(() => {
+        document.getElementById('proj-modal-head').textContent = '새 항목 추가';
+        document.getElementById('proj-input-title').value = '';
+        document.getElementById('proj-input-memo').value  = '';
+        UI.setupMemoFeatures(document.getElementById('proj-input-memo'));
+        renderChecklist();
+        UI.openModal(document.getElementById('proj-modal'));
+        setTimeout(() => document.getElementById('proj-input-title').focus(), 80);
+      }, 50);
+      return;
+    }
+
     document.getElementById('proj-modal-head').textContent = id ? '항목 편집' : '새 항목 추가';
     document.getElementById('proj-input-title').value = item?.title || '';
     document.getElementById('proj-input-memo').value  = item?.memo  || '';
@@ -196,7 +211,7 @@ const Projects = (() => {
     renderChecklist();
     UI.openModal(document.getElementById('proj-modal'));
 
-    // 신규 추가일 때만 제목 포커스 (기존 항목 편집 시 포커스 없음)
+    // 신규 추가일 때만 제목 포커스
     if (!id) {
       setTimeout(() => document.getElementById('proj-input-title').focus(), 80);
     }

@@ -155,8 +155,8 @@ const App = (() => {
       el.classList.toggle('tab-btn--active', el.dataset.tab === tab);
     });
 
-    const showFab = ['in_progress','pending','code','memo'].includes(tab); // completed 제외
-    document.getElementById('fab-add').style.display = showFab ? 'flex' : 'none';
+    const showAdd = ['in_progress','completed','pending','code','memo'].includes(tab);
+    document.getElementById('btn-add-header').style.display = showAdd ? 'flex' : 'none';
 
     document.getElementById('search-bar-code').style.display = tab === 'code' ? 'flex' : 'none';
     document.getElementById('search-bar-memo').style.display = tab === 'memo' ? 'flex' : 'none';
@@ -332,7 +332,7 @@ const App = (() => {
     document.getElementById('app-logo').addEventListener('click', () => switchTab('home'));
 
     // FAB (+)
-    document.getElementById('fab-add').addEventListener('click', () => {
+    document.getElementById('btn-add-header').addEventListener('click', () => {
       if (['in_progress','completed','pending'].includes(_currentTab)) {
         Projects.openEdit(null);
       } else if (_currentTab === 'code') {
