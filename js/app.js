@@ -137,11 +137,13 @@ const App = (() => {
 
   // ── 탭 전환 ──────────────────────────────────────────────────
   function switchTab(tab) {
+    const prevTab = _currentTab;
     _currentTab = tab;
 
-    // 홈이 아닌 탭으로 전환 시 히스토리 스택 추가
-    // → 뒤로가기 시 홈으로 돌아오게 함
-    if (tab !== 'home') {
+    // 홈이 아닌 탭으로 처음 진입할 때만 pushState 1회
+    // 같은 탭 내에서 저장/삭제/수정 후 재렌더 시 switchTab이 호출되어도
+    // prevTab === tab 이면 스택을 추가하지 않음 → 뒤로가기 1번으로 홈 이동 보장
+    if (tab !== 'home' && prevTab !== tab) {
       history.pushState({ tab }, '');
     }
 
