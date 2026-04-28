@@ -1,18 +1,21 @@
 // ============================================================
-// projects.js — 진행중 / 완료 / 구현전 탭 관리
+// projects.js — 진행중 / 완료 / 아이디어 탭 관리
 //
-// 기능:
-// - 항목 목록 렌더링 (진행률 %, 드래그 정렬, 삭제)
-// - 편집 모달 (제목, 메모, 체크리스트)
-// - 체크리스트 토글 시 즉시 저장 (debounce 800ms)
-// - 100% → 완료탭 이동 / 완료탭에서 해제 → 진행중 이동 (확인 모달)
+// [수정 사항]
+// 1. 드래그 중 Realtime render() 재호출로 DOM 파괴 → 드래그 잠금으로 해결
+// 2. 진행중/아이디어 탭: X삭제 제거, 점3개(⋮) 메뉴 추가
+//    - 진행중 → 아이디어로 이동 / 삭제
+//    - 아이디어 → 진행중으로 이동 / 삭제
+// 3. 완료 탭: 점3개 없음, X 삭제버튼만 유지
+// 4. 탭 제목 "구현 전" → "아이디어"
 // ============================================================
 const Projects = (() => {
-  let _editingId      = null;   // null = 신규
+  let _editingId      = null;
   let _currentStatus  = 'in_progress';
-  let _checklist      = [];     // 편집 모달의 임시 체크리스트
-  let _saveTimer      = null;   // 체크 디바운스 타이머
-  let _pendingStatus  = null;   // 저장 시 변경할 status
+  let _checklist      = [];
+  let _saveTimer      = null;
+  let _pendingStatus  = null;
+  let _isDragging     = false; // 드래그 중 render() 차단용
 
   // ── 진행률 계산 ───────────────────────────────────────────────
   function calcProgress(checklist) {
@@ -23,6 +26,12 @@ const Projects = (() => {
 
   // ── 목록 렌더링 ───────────────────────────────────────────────
   function render(status) {
+    // ★ 드래그 중이면 DOM 재생성 차단 — 드래그가 끊기는 원인 방지
+    if (_isDragging) {
+      console.log('[Projects] 드래그 중 — render 건너뜀');
+      return;
+    }
+
     _currentStatus = status;
     const items  = AppState.getProjects(status);
     const listEl = document.getElementById('project-list');
@@ -38,12 +47,18 @@ const Projects = (() => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
+    const isComplete = (status === 'completed');
+
     sorted.forEach(item => {
-      const pct        = calcProgress(item.checklist);
-      const isComplete = (status === 'completed');
-      const el         = document.createElement('div');
-      el.className     = 'sortable-item project-card';
-      el.dataset.id    = item.id;
+      const pct = calcProgress(item.checklist);
+      const el  = document.createElement('div');
+      el.className  = 'sortable-item project-card';
+      el.dataset.id = item.id;
+
+      // 완료탭: X버튼 / 진행중·아이디어: 점3개 메뉴
+      const actionBtn = isComplete
+        ? `<button class="btn-del-item" title="삭제">✕</button>`
+        : `<button class="btn-more" title="더보기">⋮</button>`;
 
       el.innerHTML = `
         <div class="drag-handle" title="길게 눌러 순서 변경">
@@ -70,32 +85,114 @@ const Projects = (() => {
             ? `<div class="project-checklist-summary">${item.checklist.filter(c=>c.checked).length} / ${item.checklist.length} 완료</div>`
             : ''}
         </div>
-        <button class="btn-del-item" title="삭제">✕</button>
+        ${actionBtn}
       `;
 
-      // 클릭 → 편집
+      // 카드 본문 클릭 → 편집
       el.querySelector('.project-body').addEventListener('click', () => openEdit(item.id));
       el.querySelector('.project-body').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') openEdit(item.id);
       });
 
-      // 삭제
-      el.querySelector('.btn-del-item').addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteItem(item.id);
-      });
+      if (isComplete) {
+        // 완료탭: X버튼 삭제
+        el.querySelector('.btn-del-item').addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteItem(item.id);
+        });
+      } else {
+        // 진행중·아이디어: 점3개 메뉴
+        el.querySelector('.btn-more').addEventListener('click', (e) => {
+          e.stopPropagation();
+          _openMoreMenu(e.currentTarget, item, status);
+        });
+      }
 
       listEl.appendChild(el);
     });
 
     // 드래그 정렬 초기화
-    UI.makeDraggable(listEl, async (newOrder) => {
-      newOrder.forEach(({ id, sort_order }) => {
-        const it = AppState.getById(id);
-        if (it) it.sort_order = sort_order;
-      });
-      await DB.updateSortOrders(newOrder);
+    UI.makeDraggable(listEl,
+      async (newOrder) => {
+        newOrder.forEach(({ id, sort_order }) => {
+          const it = AppState.getById(id);
+          if (it) it.sort_order = sort_order;
+        });
+        await DB.updateSortOrders(newOrder);
+      },
+      // 드래그 시작/종료 콜백으로 _isDragging 제어
+      () => { _isDragging = true; },
+      () => { _isDragging = false; }
+    );
+  }
+
+  // ── 점3개 컨텍스트 메뉴 ──────────────────────────────────────
+  function _openMoreMenu(btnEl, item, status) {
+    // 기존 메뉴 제거
+    _closeMoreMenu();
+
+    const moveLabel = status === 'in_progress' ? '💡 아이디어로 이동' : '🛠️ 진행중으로 이동';
+    const moveTarget = status === 'in_progress' ? 'pending' : 'in_progress';
+
+    const menu = document.createElement('div');
+    menu.className = 'more-menu';
+    menu.innerHTML = `
+      <button class="more-menu-item" data-action="move">${moveLabel}</button>
+      <button class="more-menu-item more-menu-item--danger" data-action="delete">✕ 삭제</button>
+    `;
+
+    // 버튼 위치 기준으로 메뉴 배치
+    const rect = btnEl.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top  = (rect.bottom + 4) + 'px';
+    menu.style.right = (window.innerWidth - rect.right) + 'px';
+    menu.dataset.menuOpen = 'true';
+
+    document.body.appendChild(menu);
+
+    menu.querySelector('[data-action="move"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      _closeMoreMenu();
+      moveItem(item.id, moveTarget);
     });
+
+    menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      _closeMoreMenu();
+      deleteItem(item.id);
+    });
+
+    // 외부 클릭 시 메뉴 닫기
+    setTimeout(() => {
+      document.addEventListener('click', _closeMoreMenu, { once: true });
+    }, 0);
+  }
+
+  function _closeMoreMenu() {
+    document.querySelectorAll('.more-menu').forEach(m => m.remove());
+  }
+
+  // ── 탭 간 이동 (진행중 ↔ 아이디어) ──────────────────────────
+  async function moveItem(id, targetStatus) {
+    const item = AppState.getById(id);
+    if (!item) return;
+
+    const labelMap = { in_progress: '진행 중', pending: '아이디어' };
+    const ok = await UI.confirm(
+      `"${item.title}"\n${labelMap[targetStatus]} 탭으로 이동할까요?`,
+      '이동', '취소'
+    );
+    if (!ok) return;
+
+    try {
+      const result = await DB.update(id, { status: targetStatus });
+      AppState.updateItem(result);
+      render(_currentStatus);
+      App.updateCounts();
+      UI.toast(`${labelMap[targetStatus]}으로 이동했습니다`, 'success');
+    } catch (e) {
+      UI.toast('이동 실패: ' + e.message, 'error');
+    }
   }
 
   // ── 편집 모달 열기 ────────────────────────────────────────────
@@ -118,7 +215,7 @@ const Projects = (() => {
 
   // ── 체크리스트 렌더링 ─────────────────────────────────────────
   function renderChecklist() {
-    const listEl   = document.getElementById('checklist-items');
+    const listEl = document.getElementById('checklist-items');
     listEl.innerHTML = '';
 
     const unchecked = _checklist.filter(c => !c.checked);
@@ -178,15 +275,15 @@ const Projects = (() => {
     c.completed_at = checked ? new Date().toISOString() : null;
     renderChecklist();
 
-    if (!_editingId) return; // 신규 작성 중엔 DB 저장 안 함
+    if (!_editingId) return;
 
     const item = AppState.getById(_editingId);
     const pct  = calcProgress(_checklist);
 
-    // ✅ 진행중 → 100% → 완료 탭 이동
+    // 진행중 → 100% → 완료 탭 이동
     if (pct === 100 && item?.status === 'in_progress') {
       const ok = await UI.confirm(
-        '코드가 모두 완성되어\n완료 탭으로 이동합니다.',
+        '모든 항목을 완료했습니다!\n완료 탭으로 이동할까요?',
         '이동', '취소'
       );
       if (ok) {
@@ -199,10 +296,10 @@ const Projects = (() => {
       }
     }
 
-    // ✅ 완료탭에서 체크 해제 → 진행중 이동
+    // 완료탭에서 체크 해제 → 진행중 이동
     if (!checked && item?.status === 'completed') {
       const ok = await UI.confirm(
-        '진행 중 탭으로 이동하여\n코드를 추가합니다.',
+        '완료를 취소하고\n진행 중 탭으로 이동할까요?',
         '이동', '취소'
       );
       if (ok) {
@@ -215,7 +312,6 @@ const Projects = (() => {
       }
     }
 
-    // 일반: debounce로 자동저장
     _scheduleCheckSave();
   }
 
@@ -252,7 +348,6 @@ const Projects = (() => {
     renderChecklist();
     input.focus();
 
-    // 완료탭에서 새 항목 추가 → 진행중 이동 경고 (저장 시 처리)
     if (_editingId) {
       const item = AppState.getById(_editingId);
       if (item?.status === 'completed') {
@@ -280,12 +375,11 @@ const Projects = (() => {
     let status       = _currentStatus;
     let completed_at = _editingId ? AppState.getById(_editingId)?.completed_at : null;
 
-    // 완료탭 편집 중, 체크리스트 변경으로 100% 미만이 된 경우
     if (_editingId) {
       const item = AppState.getById(_editingId);
       if (item?.status === 'completed' && pct < 100) {
         const ok = await UI.confirm(
-          '진행 중 탭으로 이동하여\n코드를 추가합니다.',
+          '완료를 취소하고\n진행 중 탭으로 이동할까요?',
           '이동', '취소'
         );
         if (ok) {
@@ -293,11 +387,10 @@ const Projects = (() => {
           completed_at = null;
         }
       }
-      // 완료탭에서 새 체크리스트 항목 추가(100% 아님)
       if (item?.status === 'completed' && _checklist.some(c => !c.checked)) {
         if (status === 'completed') {
           const ok = await UI.confirm(
-            '진행 중 탭으로 이동하여\n코드를 추가합니다.',
+            '완료를 취소하고\n진행 중 탭으로 이동할까요?',
             '이동', '취소'
           );
           if (ok) {
@@ -308,10 +401,9 @@ const Projects = (() => {
       }
     }
 
-    // 신규 진행중 → 100% → 완료로 넣는 경우
     if (pct === 100 && status === 'in_progress') {
       const ok = await UI.confirm(
-        '코드가 모두 완성되어\n완료 탭으로 이동합니다.',
+        '모든 항목을 완료했습니다!\n완료 탭으로 이동할까요?',
         '이동', '취소'
       );
       if (ok) {
@@ -330,7 +422,6 @@ const Projects = (() => {
     }
 
     if (!_editingId) {
-      // 신규: 현재 목록 최상단에 표시 (sort_order = min - 1)
       const existing = AppState.getProjects(status);
       const minOrd   = existing.length ? Math.min(...existing.map(i => i.sort_order)) : 0;
       payload.sort_order = minOrd - 1;
@@ -352,7 +443,6 @@ const Projects = (() => {
       App.updateCounts();
       UI.toast(_editingId ? '저장되었습니다' : '추가되었습니다', 'success');
 
-      // 탭 이동
       if (status !== _currentStatus) {
         App.switchTab(status);
       }
@@ -376,5 +466,5 @@ const Projects = (() => {
     }
   }
 
-  return { render, openEdit, toggleCheck, addCheck, removeCheck, save, deleteItem };
+  return { render, openEdit, toggleCheck, addCheck, removeCheck, save, deleteItem, moveItem };
 })();
