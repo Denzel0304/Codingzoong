@@ -60,7 +60,10 @@
   <header class="app-header">
     <button id="btn-home" class="btn-home" aria-label="홈으로">🏠 홈</button>
     <div id="app-logo"><span class="logo-icon">💻</span> 코딩중</div>
-    <button id="btn-settings" class="btn-settings" aria-label="설정">⚙️</button>
+    <div class="header-right">
+      <button id="btn-add-header" style="display:none" aria-label="추가">＋</button>
+      <button id="btn-settings" class="btn-settings" aria-label="설정">⚙️</button>
+    </div>
   </header>
 
   <!-- ── 설정 드로어 ────────────────────── -->
@@ -167,7 +170,7 @@
 
 
   <!-- ── FAB (+ 버튼) ──────────────────── -->
-  <button id="fab-add" style="display:none" aria-label="추가">＋</button>
+  <!-- FAB 제거 — 헤더 내 btn-add-header로 이동 -->
 
 
   <!-- ── 하단 탭 ────────────────────────── -->
