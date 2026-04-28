@@ -58,36 +58,19 @@ const UI = (() => {
   }
 
   // ── 범용 모달 ────────────────────────────────────────────────
-  // openModal: history.pushState로 스택 추가 → 뒤로가기 시 모달만 닫힘
   function openModal(el) {
     el.classList.add('modal--active');
     document.body.classList.add('no-scroll');
-    history.pushState({ modal: el.id }, '');
   }
 
   function closeModal(el) {
     el.classList.remove('modal--active');
     document.body.classList.remove('no-scroll');
-    // popstate로 닫히는 경우엔 이미 히스토리가 pop됐으므로 별도 back 불필요
-    // 버튼/ESC로 닫히는 경우엔 pushState한 항목을 제거
-    if (history.state && history.state.modal === el.id) {
-      history.back();
-    }
   }
 
-  // 뒤로가기 → 열린 모달 닫기 (app.js 초기화 시 한 번만 등록)
-  function initModalBackHandler() {
-    window.addEventListener('popstate', (e) => {
-      // 드로어(drawer) 상태는 app.js에서 처리
-      if (e.state && e.state.drawer) return;
-      // 열린 모달 찾아서 닫기
-      const active = document.querySelector('.modal--active');
-      if (active) {
-        active.classList.remove('modal--active');
-        document.body.classList.remove('no-scroll');
-      }
-    });
-  }
+  // 뒤로가기 처리는 app.js의 popstate 핸들러에서 통합 처리
+  // (모달 → 드로어 → 탭 → 사이트탈출 우선순위)
+  function initModalBackHandler() { /* app.js에서 통합 처리 */ }
 
   // ── 날짜 포맷 ────────────────────────────────────────────────
   function formatDate(iso) {

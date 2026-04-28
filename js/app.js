@@ -298,11 +298,24 @@ const App = (() => {
     }
 
     window.addEventListener('popstate', (e) => {
-      // 드로어 닫기
-      if (drawer.classList.contains('drawer--open')) { closeDrawer(); return; }
-      // 모달은 UI.initModalBackHandler에서 처리 — 모달 열려있으면 탭 뒤로가기 무시
-      if (document.querySelector('.modal--active')) return;
-      // 탭에서 뒤로가기 → 홈으로 이동 (pushState 없이 뷰만 전환)
+      // 우선순위 1: 드로어 열려있으면 드로어만 닫기
+      if (drawer.classList.contains('drawer--open')) {
+        closeDrawer();
+        // 드로어가 pushState로 스택을 쌓았으므로 별도 복원 불필요
+        return;
+      }
+
+      // 우선순위 2: 모달 열려있으면 모달만 닫고 탭 스택 복원
+      const activeModal = document.querySelector('.modal--active');
+      if (activeModal) {
+        activeModal.classList.remove('modal--active');
+        document.body.classList.remove('no-scroll');
+        // pop된 탭 스택을 다시 push해서 탭→홈 뒤로가기 보존
+        history.pushState(e.state, '');
+        return;
+      }
+
+      // 우선순위 3: 탭에서 뒤로가기 → 홈으로 (pushState 없이 뷰만 전환)
       if (_currentTab !== 'home') {
         _currentTab = 'home';
         document.querySelectorAll('.view').forEach(el => el.classList.remove('view--active'));
@@ -315,6 +328,7 @@ const App = (() => {
         const projTitleEl = document.getElementById('project-view-title');
         if (projTitleEl) projTitleEl.style.display = 'none';
       }
+      // 우선순위 4: 홈에서 뒤로가기 → 브라우저가 사이트 탈출 처리
     });
 
     document.getElementById('btn-settings').addEventListener('click', openDrawer);
