@@ -979,9 +979,19 @@ input, textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
-.tab-btn--active { color: var(--sky-5); }
+.tab-btn--active {
+  color: var(--sky-5);
+  font-weight: 700;
+}
 
-.tab-btn--active .tab-icon { transform: scale(1.1); }
+.tab-btn--active .tab-label {
+  color: var(--sky-5);
+}
+
+.tab-btn--active .tab-icon {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 3px rgba(45,134,187,.4));
+}
 
 .tab-icon {
   font-size: 1.25rem;
