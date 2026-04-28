@@ -973,41 +973,59 @@ input, textarea {
   gap: 0;
   padding: 4px 2px 2px;
   color: var(--text-3);
-  font-size: .62rem;
+  font-size: .65rem;
   font-weight: 500;
   transition: color .2s;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+
+/* 상단 indicator 바 */
+.tab-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: transparent;
+  transition: background .2s;
 }
 
 .tab-btn--active {
   color: var(--sky-5);
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.tab-btn--active::before {
+  background: var(--sky-5);
 }
 
 .tab-btn--active .tab-label {
   color: var(--sky-5);
+  font-size: .7rem;
 }
 
 .tab-btn--active .tab-icon {
-  transform: scale(1.15);
-  filter: drop-shadow(0 0 3px rgba(45,134,187,.4));
+  transform: scale(1.22);
+  filter: drop-shadow(0 1px 4px rgba(45,134,187,.55));
 }
 
 .tab-icon {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   line-height: 1;
   display: block;
-  transition: transform .2s;
-  margin-bottom: 6px;
-  margin-top: -2px;
+  transition: transform .2s, filter .2s;
+  margin-bottom: 5px;
+  margin-top: 2px;
 }
 
 .tab-label {
   line-height: 1;
   margin-top: 2px;
+  transition: color .2s, font-size .2s;
 }
-
-.tab-label { line-height: 1; }
 
 /* ── 모달 ──────────────────────────────────────────────────── */
 .modal-overlay {
