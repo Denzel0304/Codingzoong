@@ -1108,6 +1108,28 @@ input, textarea {
   flex-shrink: 0;
 }
 
+/* ── 모달 라벨 + 필드 그룹 ──────────────────────────────────── */
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-label {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: .2px;
+  padding-left: 2px;
+}
+
+.modal-label-hint {
+  font-weight: 400;
+  color: var(--text-3);
+  font-size: .72rem;
+  margin-left: 4px;
+}
+
 .modal-input {
   width: 100%;
   padding: 11px 13px;
