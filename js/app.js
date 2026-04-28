@@ -1,5 +1,14 @@
 // ============================================================
 // app.js — 메인 앱 (AppState + App 초기화 + 탭 라우팅 + Realtime)
+//
+// [수정 핵심]
+// 1. onSignedIn → localStorage 캐시 즉시 렌더 (화면 빠름)
+//    → 백그라운드로 서버 동기화 (로딩 스피너 없음)
+// 2. visibilitychange → 탭 복귀 시 5분 미경과면 재로드 안 함
+//    → 불필요한 "불러오는 중…" 제거
+// 3. Realtime CLOSED/SUBSCRIBED 반복은 토큰 갱신 정상 동작
+//    → 앱 레벨에서 별도 처리 불필요 (auth.js에서 _isSignedIn 플래그로 제어)
+// 4. 네트워크 복구 → 대기열 자동 flush (db.js 처리)
 // ============================================================
 
 // ── 앱 전역 상태 캐시 ─────────────────────────────────────────
@@ -33,6 +42,7 @@ const AppState = (() => {
 const App = (() => {
   let _supabase   = null;
   let _currentTab = 'home';
+  let _initialized = false; // onSignedIn 중복 실행 방지용 (auth.js와 이중 보호)
 
   // ── 초기화 ───────────────────────────────────────────────────
   async function init() {
@@ -43,43 +53,73 @@ const App = (() => {
 
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
       auth: {
-        persistSession:    true,    // 세션 localStorage 유지 (자동 로그인)
-        autoRefreshToken:  true,    // 토큰 자동 갱신
+        persistSession:     true,   // 세션 localStorage 유지 (자동 로그인)
+        autoRefreshToken:   true,   // 토큰 자동 갱신
         detectSessionInUrl: false,  // 소셜 로그인 미사용
       },
     });
 
     Auth.init(_supabase);
+    DB.setupNetworkListener(); // 온/오프라인 감지
     _bindEvents();
     Code.setupCodeEditor();
+    _setupVisibilityChange(); // 탭 복귀 감지
   }
 
   // ── 로그인 성공 ──────────────────────────────────────────────
+  // auth.js의 _isSignedIn 플래그로 1차 보호, _initialized로 2차 보호
   async function onSignedIn(user) {
+    if (_initialized) return;
+    _initialized = true;
+
     DB.init(_supabase, user.id);
     _showScreen('app');
-    _showLoader(true);
 
-    try {
-      const items = await DB.loadAll();
-      AppState.init(items);
+    // 1. localStorage 캐시로 즉시 렌더 (스피너 없음)
+    const items = await DB.loadAll((serverItems) => {
+      // 2. 백그라운드 서버 동기화 완료 → AppState 갱신 및 현재 뷰 리렌더
+      AppState.init(serverItems);
       updateCounts();
-      switchTab('home');
-      DB.subscribeToChanges(_handleRealtime);
-    } catch (e) {
-      UI.toast('데이터 로드 실패: ' + e.message, 'error');
-      console.error(e);
-    } finally {
-      _showLoader(false);
-    }
+      _rerenderCurrentTab();
+      console.log('[App] 서버 동기화 완료 —', serverItems.length, '건');
+    });
+
+    AppState.init(items);
+    updateCounts();
+    switchTab('home');
+
+    // 3. Realtime 구독 (다른 기기 변경 수신용)
+    DB.subscribeToChanges(_handleRealtime);
   }
 
   // ── 로그아웃 ─────────────────────────────────────────────────
   function onSignedOut() {
+    _initialized = false;
     DB.unsubscribe();
     AppState.init([]);
     _showScreen('login');
     document.getElementById('login-pw').value = '';
+  }
+
+  // ── visibilitychange: 탭 복귀 시 스마트 동기화 ───────────────
+  function _setupVisibilityChange() {
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden) return;           // 탭 숨김 시 무시
+      if (!_initialized) return;            // 로그인 전 무시
+
+      console.log('[App] 탭 복귀 — 동기화 체크');
+      // 5분 미경과 → 재로드 없음 (불필요한 "불러오는 중…" 제거)
+      const updated = await DB.syncIfStale((serverItems) => {
+        AppState.init(serverItems);
+        updateCounts();
+        _rerenderCurrentTab();
+        console.log('[App] 탭 복귀 동기화 완료');
+      });
+
+      if (!updated) {
+        console.log('[App] 탭 복귀 — 캐시 신선함, 재렌더 생략');
+      }
+    });
   }
 
   // ── 화면 전환 ────────────────────────────────────────────────
@@ -88,15 +128,16 @@ const App = (() => {
     document.getElementById('screen-app').style.display   = name === 'app'   ? 'flex' : 'none';
   }
 
+  // loader는 더 이상 사용하지 않지만 HTML 호환성을 위해 유지
   function _showLoader(show) {
-    document.getElementById('app-loader').style.display = show ? 'flex' : 'none';
+    const el = document.getElementById('app-loader');
+    if (el) el.style.display = show ? 'flex' : 'none';
   }
 
   // ── 탭 전환 ──────────────────────────────────────────────────
   function switchTab(tab) {
     _currentTab = tab;
 
-    // 뷰 표시/숨김
     document.querySelectorAll('.view').forEach(el => el.classList.remove('view--active'));
     const viewMap = {
       home:        'view-home',
@@ -109,20 +150,16 @@ const App = (() => {
     const viewEl = document.getElementById(viewMap[tab] || 'view-home');
     if (viewEl) viewEl.classList.add('view--active');
 
-    // 하단 탭 활성화
     document.querySelectorAll('.tab-btn').forEach(el => {
       el.classList.toggle('tab-btn--active', el.dataset.tab === tab);
     });
 
-    // FAB 표시/숨김
     const showFab = ['in_progress','completed','pending','code','memo'].includes(tab);
     document.getElementById('fab-add').style.display = showFab ? 'flex' : 'none';
 
-    // 검색바 표시/숨김
     document.getElementById('search-bar-code').style.display = tab === 'code' ? 'flex' : 'none';
     document.getElementById('search-bar-memo').style.display = tab === 'memo' ? 'flex' : 'none';
 
-    // 프로젝트 탭 제목 표시
     const projTitleEl = document.getElementById('project-view-title');
     if (projTitleEl) {
       const titleMap = { in_progress: '⚙️ 진행 중', completed: '🏆 완료', pending: '💡 구현 전' };
@@ -130,12 +167,16 @@ const App = (() => {
       projTitleEl.style.display = titleMap[tab] ? 'block' : 'none';
     }
 
-    // 렌더링
-    if (['in_progress','completed','pending'].includes(tab)) {
-      Projects.render(tab);
-    } else if (tab === 'code') {
+    _rerenderCurrentTab();
+  }
+
+  // ── 현재 탭 리렌더 (내부 헬퍼) ───────────────────────────────
+  function _rerenderCurrentTab() {
+    if (['in_progress','completed','pending'].includes(_currentTab)) {
+      Projects.render(_currentTab);
+    } else if (_currentTab === 'code') {
       Code.render();
-    } else if (tab === 'memo') {
+    } else if (_currentTab === 'memo') {
       Memo.render();
     }
   }
@@ -154,17 +195,23 @@ const App = (() => {
   function _setBadge(id, count) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.textContent      = count;
-    el.style.display    = count > 0 ? 'flex' : 'none';
+    el.textContent   = count;
+    el.style.display = count > 0 ? 'flex' : 'none';
   }
 
-  // ── Realtime 처리 ────────────────────────────────────────────
+  // ── Realtime 처리 ─────────────────────────────────────────────
+  // 다른 기기에서의 변경사항만 처리
+  // (내 기기 변경은 insert/update/remove 호출 시 이미 AppState 반영됨)
   function _handleRealtime(payload) {
     const { eventType, new: newRow, old: oldRow } = payload;
-    console.log('[RT]', eventType);
+
+    // 내 기기에서 발생한 임시 ID 항목은 이미 처리됨 → 무시
+    if (newRow?.id?.startsWith('tmp_')) return;
 
     if (eventType === 'INSERT') {
-      if (!AppState.getById(newRow.id)) AppState.addItem(newRow);
+      // 이미 존재하는 항목이면 무시 (내 기기 삽입의 Realtime echo)
+      if (AppState.getById(newRow.id)) return;
+      AppState.addItem(newRow);
     } else if (eventType === 'UPDATE') {
       AppState.updateItem(newRow);
     } else if (eventType === 'DELETE') {
@@ -172,15 +219,7 @@ const App = (() => {
     }
 
     updateCounts();
-
-    // 현재 뷰 리렌더
-    if (['in_progress','completed','pending'].includes(_currentTab)) {
-      Projects.render(_currentTab);
-    } else if (_currentTab === 'code') {
-      Code.render();
-    } else if (_currentTab === 'memo') {
-      Memo.render();
-    }
+    _rerenderCurrentTab();
   }
 
   // ── 이벤트 바인딩 ────────────────────────────────────────────
@@ -194,11 +233,10 @@ const App = (() => {
       const btn   = document.getElementById('login-btn');
       const err   = document.getElementById('login-error');
 
-      // ── 잠금 체크 ──────────────────────────────────────────────
-      const LOCK_KEY      = 'login_lock';
-      const ATTEMPT_KEY   = 'login_attempts';
-      const MAX_ATTEMPTS  = 5;
-      const LOCK_MINUTES  = 10;
+      const LOCK_KEY     = 'login_lock';
+      const ATTEMPT_KEY  = 'login_attempts';
+      const MAX_ATTEMPTS = 5;
+      const LOCK_MINUTES = 10;
 
       const lockUntil = parseInt(localStorage.getItem(LOCK_KEY) || '0', 10);
       if (lockUntil && Date.now() < lockUntil) {
@@ -213,12 +251,9 @@ const App = (() => {
 
       try {
         await Auth.login(email, pw);
-        // 로그인 성공 시 실패 카운트 초기화
         localStorage.removeItem(LOCK_KEY);
         localStorage.removeItem(ATTEMPT_KEY);
-        // onSignedIn은 onAuthStateChange에서 자동 호출
       } catch (ex) {
-        // 실패 횟수 누적
         const attempts = parseInt(localStorage.getItem(ATTEMPT_KEY) || '0', 10) + 1;
         if (attempts >= MAX_ATTEMPTS) {
           localStorage.setItem(LOCK_KEY, String(Date.now() + LOCK_MINUTES * 60 * 1000));
@@ -236,7 +271,7 @@ const App = (() => {
     // 홈 버튼
     document.getElementById('btn-home').addEventListener('click', () => switchTab('home'));
 
-    // 설정 드로어 열기/닫기
+    // 설정 드로어
     const drawer  = document.getElementById('settings-drawer');
     const overlay = document.getElementById('drawer-overlay');
 
@@ -244,7 +279,6 @@ const App = (() => {
       drawer.classList.add('drawer--open');
       overlay.classList.add('drawer--open');
       document.body.classList.add('no-scroll');
-      // 모바일 뒤로가기로 드로어만 닫히도록 히스토리 스택에 추가
       history.pushState({ drawer: true }, '');
     }
 
@@ -254,17 +288,13 @@ const App = (() => {
       document.body.classList.remove('no-scroll');
     }
 
-    // 모바일 뒤로가기 → 드로어가 열려있으면 드로어만 닫기
-    window.addEventListener('popstate', (e) => {
-      if (drawer.classList.contains('drawer--open')) {
-        closeDrawer();
-      }
+    window.addEventListener('popstate', () => {
+      if (drawer.classList.contains('drawer--open')) closeDrawer();
     });
 
     document.getElementById('btn-settings').addEventListener('click', openDrawer);
     document.getElementById('drawer-close').addEventListener('click', () => {
       closeDrawer();
-      // pushState로 쌓은 히스토리를 다시 제거
       if (history.state && history.state.drawer) history.back();
     });
     overlay.addEventListener('click', () => {
@@ -272,24 +302,17 @@ const App = (() => {
       if (history.state && history.state.drawer) history.back();
     });
 
-    // 홈 화면 원형 클릭 → 해당 탭으로 이동
-    const circleMap = {
-      'badge-inprogress': 'in_progress',
-      'badge-completed':  'completed',
-      'badge-pending':    'pending',
-    };
-    Object.entries(circleMap).forEach(([badgeId, tab]) => {
-      const node = document.getElementById(badgeId)?.closest('.circle-node')
-                || document.getElementById(badgeId)?.parentElement?.closest('.circle-node');
-      // badge가 hidden이어도 circle-ring 자체에 접근
+    // 홈 원형 클릭 → 탭 이동
+    ['badge-inprogress','badge-completed','badge-pending'].forEach(badgeId => {
+      const tabMap = { 'badge-inprogress': 'in_progress', 'badge-completed': 'completed', 'badge-pending': 'pending' };
       const ring = document.getElementById(badgeId)?.closest('.circle-ring');
       if (ring) {
         ring.style.cursor = 'pointer';
-        ring.addEventListener('click', () => switchTab(tab));
+        ring.addEventListener('click', () => switchTab(tabMap[badgeId]));
       }
     });
 
-    // 로그아웃 (드로어 내)
+    // 로그아웃
     document.getElementById('btn-logout').addEventListener('click', async () => {
       closeDrawer();
       const ok = await UI.confirm('로그아웃 하시겠습니까?');
@@ -318,7 +341,7 @@ const App = (() => {
       }
     });
 
-    // ── 프로젝트 모달 ──────────────────────────────────────────
+    // 프로젝트 모달
     document.getElementById('proj-save-btn').addEventListener('click',  () => Projects.save());
     document.getElementById('proj-close-btn').addEventListener('click', () => UI.closeModal(document.getElementById('proj-modal')));
     document.getElementById('proj-modal').addEventListener('click', (e) => {
@@ -330,7 +353,7 @@ const App = (() => {
       if (e.key === 'Enter') { e.preventDefault(); Projects.addCheck(); }
     });
 
-    // ── 코드 모달 ──────────────────────────────────────────────
+    // 코드 모달
     document.getElementById('code-save-btn').addEventListener('click',   () => Code.save());
     document.getElementById('code-close-btn').addEventListener('click',  () => UI.closeModal(document.getElementById('code-modal')));
     document.getElementById('code-toggle-btn').addEventListener('click', () => Code.togglePreview());
@@ -343,7 +366,7 @@ const App = (() => {
       Code.search(e.target.value);
     });
 
-    // ── 메모 모달 ──────────────────────────────────────────────
+    // 메모 모달
     document.getElementById('memo-save-btn').addEventListener('click',  () => Memo.save());
     document.getElementById('memo-close-btn').addEventListener('click', () => UI.closeModal(document.getElementById('memo-modal')));
     document.getElementById('memo-modal').addEventListener('click', (e) => {
