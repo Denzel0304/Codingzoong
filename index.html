@@ -92,17 +92,17 @@
     <div id="view-home" class="view">
       <div class="home-center">
 
-      <!-- 삼각형 배치: 진행중(위), 구현전(좌하), 완료(우하) -->
+      <!-- 삼각형 배치: 수정중(위), 구현전(좌하), 완료(우하) -->
       <div class="home-triangle">
 
-        <!-- 위: 진행중 -->
+        <!-- 위: 수정중 -->
         <div class="triangle-top">
           <div class="circle-node">
             <div class="circle-ring">
               <span class="circle-icon">🛠️</span>
               <div id="badge-inprogress" class="circle-badge" style="display:none">0</div>
             </div>
-            <span class="circle-label">진행 중</span>
+            <span class="circle-label">수정중</span>
           </div>
         </div>
 
@@ -172,9 +172,9 @@
 
   <!-- ── 하단 탭 ────────────────────────── -->
   <nav class="bottom-tabs" role="tablist">
-    <button class="tab-btn" data-tab="in_progress" role="tab" aria-label="진행중">
+    <button class="tab-btn" data-tab="in_progress" role="tab" aria-label="수정중">
       <span class="tab-icon">🛠️</span>
-      <span class="tab-label">진행중</span>
+      <span class="tab-label">수정중</span>
     </button>
     <button class="tab-btn" data-tab="completed" role="tab" aria-label="완료">
       <span class="tab-icon">🏆</span>
@@ -227,13 +227,13 @@
           </div>
         </div>
 
+        <div id="checklist-items" class="checklist-items"></div>
+
         <div class="checklist-add-row">
           <input id="checklist-new-input" class="checklist-input" type="text"
                  placeholder="새 항목 추가… (Enter)">
           <button id="checklist-add-btn" class="btn-add-check" aria-label="항목 추가">+</button>
         </div>
-
-        <div id="checklist-items" class="checklist-items"></div>
       </div>
     </div>
 
