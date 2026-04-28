@@ -162,7 +162,7 @@ const App = (() => {
 
     const projTitleEl = document.getElementById('project-view-title');
     if (projTitleEl) {
-      const titleMap = { in_progress: '⚙️ 진행 중', completed: '🏆 완료', pending: '💡 구현 전' };
+      const titleMap = { in_progress: '⚙️ 진행 중', completed: '🏆 완료', pending: '💡 아이디어' };
       projTitleEl.textContent = titleMap[tab] || '';
       projTitleEl.style.display = titleMap[tab] ? 'block' : 'none';
     }
