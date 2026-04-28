@@ -139,6 +139,12 @@ const App = (() => {
   function switchTab(tab) {
     _currentTab = tab;
 
+    // 홈이 아닌 탭으로 전환 시 히스토리 스택 추가
+    // → 뒤로가기 시 홈으로 돌아오게 함
+    if (tab !== 'home') {
+      history.pushState({ tab }, '');
+    }
+
     document.querySelectorAll('.view').forEach(el => el.classList.remove('view--active'));
     const viewMap = {
       home:        'view-home',
@@ -289,8 +295,24 @@ const App = (() => {
       document.body.classList.remove('no-scroll');
     }
 
-    window.addEventListener('popstate', () => {
-      if (drawer.classList.contains('drawer--open')) closeDrawer();
+    window.addEventListener('popstate', (e) => {
+      // 드로어 닫기
+      if (drawer.classList.contains('drawer--open')) { closeDrawer(); return; }
+      // 모달은 UI.initModalBackHandler에서 처리 — 모달 열려있으면 탭 뒤로가기 무시
+      if (document.querySelector('.modal--active')) return;
+      // 탭에서 뒤로가기 → 홈으로 이동 (pushState 없이 뷰만 전환)
+      if (_currentTab !== 'home') {
+        _currentTab = 'home';
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('view--active'));
+        const homeEl = document.getElementById('view-home');
+        if (homeEl) homeEl.classList.add('view--active');
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('tab-btn--active'));
+        document.getElementById('btn-add-header').style.display = 'none';
+        document.getElementById('search-bar-code').style.display = 'none';
+        document.getElementById('search-bar-memo').style.display = 'none';
+        const projTitleEl = document.getElementById('project-view-title');
+        if (projTitleEl) projTitleEl.style.display = 'none';
+      }
     });
 
     document.getElementById('btn-settings').addEventListener('click', openDrawer);
