@@ -670,6 +670,50 @@ input, textarea {
 
 .btn-del-item:hover { color: var(--danger); background: #fff0f0; }
 
+/* ── 점3개 버튼 ── */
+.btn-more {
+  padding: 0 14px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-3);
+  flex-shrink: 0;
+  transition: color .2s, background .2s;
+  border-left: 1px solid var(--sky-1);
+  letter-spacing: -1px;
+}
+.btn-more:hover { color: var(--primary); background: #f0f4ff; }
+
+/* ── 점3개 컨텍스트 메뉴 ── */
+.more-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--white);
+  border: 1.5px solid var(--sky-2);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.13);
+  overflow: hidden;
+  min-width: 160px;
+  animation: menuPop .15s ease;
+}
+@keyframes menuPop {
+  from { opacity: 0; transform: scale(.92) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1)  translateY(0); }
+}
+.more-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  text-align: left;
+  font-size: .88rem;
+  color: var(--text-1);
+  transition: background .15s;
+  border-bottom: 1px solid var(--sky-1);
+}
+.more-menu-item:last-child { border-bottom: none; }
+.more-menu-item:hover { background: var(--sky-0); }
+.more-menu-item--danger { color: var(--danger); }
+.more-menu-item--danger:hover { background: #fff0f0; }
+
 /* ── 코드 뷰 ────────────────────────────────────────────────── */
 .search-bar {
   display: none;
