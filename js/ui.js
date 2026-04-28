@@ -222,6 +222,93 @@ const UI = (() => {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
+  // ── 메모 자동넘버링 + 링크 미리보기 ─────────────────────────
+  // textarea에 연결. 한 번만 바인딩 (중복 방지용 플래그).
+  function setupMemoFeatures(textarea) {
+    if (!textarea || textarea._memoFeaturesReady) return;
+    textarea._memoFeaturesReady = true;
+
+    // ── 1. 자동 넘버링 ──────────────────────────────────────────
+    // "숫자." 으로 시작하는 줄에서 Enter → 다음 번호 자동 삽입
+    // 빈 번호 줄(예: "3. " 만 있을 때)에서 Enter → 번호 줄 제거
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+
+      const val   = textarea.value;
+      const pos   = textarea.selectionStart;
+      const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+      const line  = val.substring(lineStart, pos);
+
+      // "숫자. " 패턴 (숫자 뒤 점, 그 뒤 공백)
+      const m = line.match(/^(\d+)\.\s(.*)$/);
+      if (!m) return; // 넘버링 줄 아님 → 기본 Enter
+
+      e.preventDefault();
+
+      const num  = parseInt(m[1], 10);
+      const text = m[2];
+
+      if (!text.trim()) {
+        // 빈 번호 줄 → 번호 제거 후 빈 줄로
+        const before = val.substring(0, lineStart);
+        const after  = val.substring(pos);
+        textarea.value = before + after;
+        textarea.selectionStart = textarea.selectionEnd = lineStart;
+      } else {
+        // 다음 번호 삽입
+        const insert = '\n' + (num + 1) + '. ';
+        const before = val.substring(0, pos);
+        const after  = val.substring(pos);
+        textarea.value = before + insert + after;
+        textarea.selectionStart = textarea.selectionEnd = pos + insert.length;
+      }
+
+      // 링크 미리보기 갱신
+      _updateLinkPreview(textarea);
+    });
+
+    // " " (스페이스) 입력 감지: "숫자." 뒤 스페이스 → 넘버링 시작
+    textarea.addEventListener('input', () => {
+      _updateLinkPreview(textarea);
+    });
+
+    // 초기 링크 미리보기
+    _updateLinkPreview(textarea);
+  }
+
+  // ── 링크 미리보기 (textarea 바로 아래 삽입) ─────────────────
+  function _updateLinkPreview(textarea) {
+    // 기존 미리보기 제거
+    let preview = textarea._linkPreview;
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'memo-link-preview';
+      textarea.parentNode.insertBefore(preview, textarea.nextSibling);
+      textarea._linkPreview = preview;
+    }
+
+    const text = textarea.value;
+    // http:// 또는 https:// 로 시작하는 URL 추출 (대소문자 무관)
+    const urlRegex = /https?:\/\/[^\s\u3000\u00a0<>"']+/gi;
+    const urls = [...new Set(text.match(urlRegex) || [])];
+
+    if (!urls.length) {
+      preview.style.display = 'none';
+      preview.innerHTML = '';
+      return;
+    }
+
+    preview.style.display = 'flex';
+    preview.innerHTML = urls.map(url => {
+      let domain = '';
+      try { domain = new URL(url).hostname; } catch { domain = url.slice(0, 30); }
+      return `<a class="memo-link-item" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">
+        🔗 <span class="memo-link-domain">${escHtml(domain)}</span>
+        <span class="memo-link-url">${escHtml(url.length > 50 ? url.slice(0, 50) + '…' : url)}</span>
+      </a>`;
+    }).join('');
+  }
+
   return {
     toast, confirm,
     openModal, closeModal,
@@ -230,5 +317,6 @@ const UI = (() => {
     escHtml,
     makeDraggable,
     genId,
+    setupMemoFeatures,
   };
 })();

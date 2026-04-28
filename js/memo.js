@@ -76,6 +76,7 @@ const Memo = (() => {
     document.getElementById('memo-input-memo').value  = item?.memo  || '';
     document.getElementById('memo-input-tags').value  = UI.tagsToString(item?.tags);
 
+    UI.setupMemoFeatures(document.getElementById('memo-input-memo'));
     UI.openModal(document.getElementById('memo-modal'));
     setTimeout(() => document.getElementById('memo-input-title').focus(), 80);
   }

@@ -96,6 +96,7 @@ const Code = (() => {
     document.getElementById('code-lang-badge').textContent =
       item?.language ? item.language : '자동 감지됨';
 
+    UI.setupMemoFeatures(document.getElementById('code-input-memo'));
     // 미리보기 초기화
     _showEditor(true);
 
