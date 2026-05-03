@@ -181,6 +181,12 @@ const Projects = (() => {
     } catch (e) { UI.toast('이동 실패: ' + e.message, 'error'); }
   }
 
+  // ── 미저장 편집 취소 (뒤로가기 / 닫기 버튼 시 호출) ─────────
+  // 자동저장 타이머를 취소하여 미저장 체크리스트 변경이 AppState에 반영되지 않도록 함
+  function cancelEdit() {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+  }
+
   // ── 편집 모달 열기 ────────────────────────────────────────────
   function openEdit(id) {
     _editingId     = id || null;
@@ -195,6 +201,7 @@ const Projects = (() => {
         document.getElementById('proj-modal-head').textContent = '새 아이디어 추가';
         document.getElementById('proj-input-title').value = '';
         document.getElementById('proj-input-memo').value  = '';
+        document.getElementById('checklist-new-input').value = ''; // 이전 미저장 입력 초기화
         UI.setupMemoFeatures(document.getElementById('proj-input-memo'));
         renderChecklist();
         UI.openModal(document.getElementById('proj-modal'));
@@ -206,6 +213,7 @@ const Projects = (() => {
     document.getElementById('proj-modal-head').textContent = id ? '항목 편집' : '새 아이디어 추가';
     document.getElementById('proj-input-title').value = item?.title || '';
     document.getElementById('proj-input-memo').value  = item?.memo  || '';
+    document.getElementById('checklist-new-input').value = ''; // 이전 미저장 입력 초기화
 
     UI.setupMemoFeatures(document.getElementById('proj-input-memo'));
     renderChecklist();
@@ -349,6 +357,7 @@ const Projects = (() => {
     el.className = `checklist-item${c.checked ? ' checklist-item--done' : ''}`;
     el.dataset.cid = c.id;
 
+    // check-text는 label 밖에 위치 → 글자 클릭이 체크박스 토글을 유발하지 않음
     el.innerHTML = `
       ${!c.checked ? `<div class="check-drag-handle" title="드래그로 순서 변경">
         <span class="check-drag-icon"><span></span></span>
@@ -356,17 +365,65 @@ const Projects = (() => {
       <label class="check-label">
         <input type="checkbox" class="check-input" ${c.checked ? 'checked' : ''} data-cid="${c.id}">
         <span class="check-box"></span>
-        <span class="check-text">${UI.escHtml(c.text)}</span>
       </label>
+      <span class="check-text" data-cid="${c.id}" title="클릭하여 편집"></span>
       ${c.checked && c.completed_at
         ? `<span class="check-time">${UI.formatDate(c.completed_at)}</span>`
         : ''}
       <button class="check-del-btn" data-cid="${c.id}" title="항목 삭제">✕</button>
     `;
 
+    // textContent로 설정 — XSS 방지 및 이모지 등 특수문자 보존
+    el.querySelector('.check-text').textContent = c.text;
+
+    // ── 체크박스 토글 ─────────────────────────────────────────
     el.querySelector('.check-input').addEventListener('change', (e) => {
       toggleCheck(c.id, e.target.checked);
     });
+
+    // ── 글자 클릭 → 인라인 편집 (체크 토글 없음) ─────────────
+    const textSpan = el.querySelector('.check-text');
+    textSpan.addEventListener('click', (e) => {
+      e.stopPropagation();
+      textSpan.contentEditable = 'true';
+      textSpan.classList.add('check-text--editing');
+      textSpan.focus();
+      // 커서를 텍스트 끝으로 이동
+      const range = document.createRange();
+      const sel   = window.getSelection();
+      range.selectNodeContents(textSpan);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    });
+
+    textSpan.addEventListener('blur', () => {
+      textSpan.contentEditable = 'false';
+      textSpan.classList.remove('check-text--editing');
+      const newText = textSpan.textContent.trim();
+      if (!newText) {
+        // 내용이 비면 원래 텍스트로 복원
+        textSpan.textContent = c.text;
+        return;
+      }
+      if (newText !== c.text) {
+        c.text = newText;
+        if (_editingId) _scheduleCheckSave();
+      }
+    });
+
+    textSpan.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        textSpan.blur();
+      }
+      if (e.key === 'Escape') {
+        textSpan.textContent = c.text; // 변경사항 폐기
+        textSpan.blur();
+      }
+    });
+
+    // ── 삭제 버튼 ────────────────────────────────────────────
     el.querySelector('.check-del-btn').addEventListener('click', (e) => {
       e.stopPropagation(); removeCheck(c.id);
     });
@@ -393,21 +450,19 @@ const Projects = (() => {
     const pct  = calcProgress(_checklist);
 
     if (pct === 100 && item?.status === 'in_progress') {
-      const ok = await UI.confirm('모든 항목을 완료했습니다!\n완료 탭으로 이동할까요?', '이동', '취소');
-      if (ok) {
-        await _flushSave({ status: 'completed', completed_at: new Date().toISOString() });
-        UI.closeModal(document.getElementById('proj-modal'));
-        App.updateCounts(); App.switchTab('completed'); return;
-      }
+      // Fix 5: 취소 없음 — 모든 항목 완료 시 무조건 완료 탭으로 이동
+      await UI.alertModal('모든 항목을 완료했습니다!\n완료 탭으로 이동합니다.', '확인');
+      await _flushSave({ status: 'completed', completed_at: new Date().toISOString() });
+      UI.closeModal(document.getElementById('proj-modal'));
+      App.updateCounts(); App.switchTab('completed'); return;
     }
 
     if (!checked && item?.status === 'completed') {
-      const ok = await UI.confirm('완료를 취소하고\n수정중 탭으로 이동할까요?', '이동', '취소');
-      if (ok) {
-        await _flushSave({ status: 'in_progress', completed_at: null });
-        UI.closeModal(document.getElementById('proj-modal'));
-        App.updateCounts(); App.switchTab('in_progress'); return;
-      }
+      // Fix 4: 취소 없음 — 완료 탭에서 체크 해제 시 무조건 수정중 탭으로 이동
+      await UI.alertModal('완료를 취소하고\n수정중 탭으로 이동합니다.', '확인');
+      await _flushSave({ status: 'in_progress', completed_at: null });
+      UI.closeModal(document.getElementById('proj-modal'));
+      App.updateCounts(); App.switchTab('in_progress'); return;
     }
 
     _scheduleCheckSave();
@@ -467,14 +522,16 @@ const Projects = (() => {
     if (_editingId) {
       const item = AppState.getById(_editingId);
       if (item?.status === 'completed' && (pct < 100 || _checklist.some(c => !c.checked))) {
-        const ok = await UI.confirm('완료를 취소하고\n수정중 탭으로 이동할까요?', '이동', '취소');
-        if (ok) { status = 'in_progress'; completed_at = null; }
+        // Fix 4: 취소 없음 — 완료 항목에서 미완료 체크리스트 있으면 무조건 수정중으로 이동
+        await UI.alertModal('완료를 취소하고\n수정중 탭으로 이동합니다.', '확인');
+        status = 'in_progress'; completed_at = null;
       }
     }
 
     if (pct === 100 && status === 'in_progress') {
-      const ok = await UI.confirm('모든 항목을 완료했습니다!\n완료 탭으로 이동할까요?', '이동', '취소');
-      if (ok) { status = 'completed'; completed_at = new Date().toISOString(); }
+      // Fix 5: 취소 없음 — 모든 항목 완료 시 무조건 완료 탭으로 이동
+      await UI.alertModal('모든 항목을 완료했습니다!\n완료 탭으로 이동합니다.', '확인');
+      status = 'completed'; completed_at = new Date().toISOString();
     }
 
     const payload = { title, memo, checklist: _checklist, status };
@@ -528,5 +585,5 @@ const Projects = (() => {
     } catch (e) { UI.toast('삭제 실패: ' + e.message, 'error'); }
   }
 
-  return { render, openEdit, toggleCheck, addCheck, removeCheck, save, deleteItem, moveItem };
+  return { render, openEdit, cancelEdit, toggleCheck, addCheck, removeCheck, save, deleteItem, moveItem };
 })();

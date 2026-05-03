@@ -26,6 +26,35 @@ const UI = (() => {
     }, 2600);
   }
 
+  // ── 단일 버튼 알림 모달 (확인만, 취소 없음) ─────────────────
+  // 정해진 원칙에 따라 무조건 진행해야 할 때 사용
+  function alertModal(message, confirmText = '확인') {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="confirm-box">
+          <p class="confirm-msg">${escHtml(message).replace(/\n/g, '<br>')}</p>
+          <div class="confirm-btns">
+            <button class="confirm-ok">${escHtml(confirmText)}</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => overlay.classList.add('confirm-overlay--show'));
+      });
+
+      const close = () => {
+        overlay.classList.remove('confirm-overlay--show');
+        setTimeout(() => overlay.remove(), 250);
+        resolve(true);
+      };
+
+      overlay.querySelector('.confirm-ok').onclick = close;
+    });
+  }
+
   // ── 확인 모달 (Promise 기반) ─────────────────────────────────
   function confirm(message, confirmText = '확인', cancelText = '취소') {
     return new Promise((resolve) => {
@@ -314,7 +343,7 @@ const UI = (() => {
   }
 
   return {
-    toast, confirm,
+    toast, confirm, alertModal,
     openModal, closeModal, initModalBackHandler,
     formatDate, formatDateShort,
     parseTags, tagsToString, renderTags,

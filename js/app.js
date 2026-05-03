@@ -53,9 +53,10 @@ const App = (() => {
 
     _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
       auth: {
-        persistSession:     true,   // 세션 localStorage 유지 (자동 로그인)
-        autoRefreshToken:   true,   // 토큰 자동 갱신
-        detectSessionInUrl: false,  // 소셜 로그인 미사용
+        persistSession:     true,         // 세션 localStorage 유지 (자동 로그인)
+        autoRefreshToken:   true,         // 토큰 자동 갱신
+        detectSessionInUrl: false,        // 소셜 로그인 미사용
+        storageKey:         'zcoding_sb_auth_v1', // 타 Supabase 앱과 충돌 방지용 고유 키
       },
     });
 
@@ -310,6 +311,8 @@ const App = (() => {
       if (activeModal) {
         activeModal.classList.remove('modal--active');
         document.body.classList.remove('no-scroll');
+        // proj-modal이 뒤로가기로 닫힐 때 → 미저장 변경사항 폐기
+        if (activeModal.id === 'proj-modal') Projects.cancelEdit();
         // pop된 탭 스택을 다시 push해서 탭→홈 뒤로가기 보존
         history.pushState(e.state, '');
         return;
@@ -382,7 +385,10 @@ const App = (() => {
 
     // 프로젝트 모달
     document.getElementById('proj-save-btn').addEventListener('click',  () => Projects.save());
-    document.getElementById('proj-close-btn').addEventListener('click', () => UI.closeModal(document.getElementById('proj-modal')));
+    document.getElementById('proj-close-btn').addEventListener('click', () => {
+      Projects.cancelEdit(); // 저장 타이머 취소 — 미저장 변경사항 폐기
+      UI.closeModal(document.getElementById('proj-modal'));
+    });
     document.getElementById('proj-modal').addEventListener('click', (e) => {
       if (e.target.id === 'proj-modal') UI.closeModal(e.target);
     });
